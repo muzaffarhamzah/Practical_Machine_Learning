@@ -94,7 +94,7 @@ nzv <- nearZeroVar(DTrainCS, saveMetrics=TRUE)
 
 if (any(nzv$nzv)) nzv else message("No variables with near zero variance")
 ```
-//------------------------------------------------------
+
 ## Training Prediction Model
 1. Setting up parallel clusters.
 ```{r paraCluster}
@@ -123,7 +123,7 @@ system.time(trainingModel <- train(classe ~ ., data=DTrainCS, method=method))
 stopCluster(clus)
 ```
 
-### Test the model on training dataset.
+### a. Test the model on training dataset.
 ```{r loadTrainModel}
 trainingModel
 ```
@@ -133,13 +133,13 @@ hat <- predict(trainingModel, DTrainCS)
 confusionMatrix(hat, DTrain[, classe])
 ```
 
-### Test the model on test probing dataset.
+### b. Test the model on test probing dataset.
 ```{r testProbe}
 hat <- predict(trainingModel, DProbeCS)
 confusionMatrix(hat, DProbeCS[, classe])
 ```
 
-### Present final model
+### c. Present final model
 ```{r varImpTrainModel}
 varImp(trainingModel)
 ```
