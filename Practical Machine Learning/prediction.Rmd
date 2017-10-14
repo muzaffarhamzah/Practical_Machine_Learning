@@ -1,0 +1,171 @@
+---
+title: "Prediction Assignment Writeup"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. This task is to perform analysis on barbell lifts correctly and incorrectly in 5 different ways from the data by accelerometers on the belt, forearm, arm and dumble of 6 participants.
+
+1. Training data: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+2. Test data: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+These data comes from http://groupware.les.inf.puc-rio.br/har.
+
+## Loading Datasets
+Download the datasets and read it into data table.
+```{r loadData}
+require(data.table)
+
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+D <- fread(url)
+```
+
+```{r loadTestData}
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+DTest <- fread(url)
+```
+
+`belt`, `arm`, `dumbbell`, and `forearm` variables that do not have any missing values in the test dataset will be predictor candidates.
+```{r selectPredictors}
+isAnyMissing <- sapply(DTest, function (x) any(is.na(x) | x == ""))
+isPredictor <- !isAnyMissing & grepl("belt|[^(fore)]arm|dumbbell|forearm", names(isAnyMissing))
+predCandidates <- names(isAnyMissing)[isPredictor]
+
+predCandidates
+```
+
+Subset the primary dataset to include only the predictor candidates and the outcome variable `classe`.
+```{r compilePredictors}
+varToInclude <- c("classe", predCandidates)
+D <- D[, varToInclude, with=FALSE]
+
+dim(D)
+```
+
+```{r viewData}
+names(D)
+```
+
+* Compile `classe` into factor to be used in model.
+```{r compileFactors}
+D <- D[, classe := factor(D[, classe])]
+D[, .N, classe]
+```
+
+* Split the dataset into a 60% training and 40% probing dataset.
+```{r splitSet}
+require(caret)
+
+seed <- as.numeric(as.Date("2014-10-26"))
+set.seed(seed)
+inTrain <- createDataPartition(D$classe, p=0.6)
+DTrain <- D[inTrain[[1]]]
+DProbe <- D[-inTrain[[1]]]
+```
+
+* Preprocess the prediction variables by centering and scaling.
+```{r preProcess}
+X <- DTrain[, predCandidates, with=FALSE]
+preProc <- preProcess(X)
+preProc
+```
+
+```{r centerScale}
+XCS <- predict(preProc, X)
+DTrainCS <- data.table(data.frame(classe = DTrain[, classe], XCS))
+```
+
+* Apply process centering and scaling to probing dataset.
+```{r centerScaleProbe}
+X <- DProbe[, predCandidates, with=FALSE]
+XCS <- predict(preProc, X)
+DProbeCS <- data.table(data.frame(classe = DProbe[, classe], XCS))
+```
+
+* Evaluate for near zero variance.
+```{r zeroVar}
+nzv <- nearZeroVar(DTrainCS, saveMetrics=TRUE)
+
+if (any(nzv$nzv)) nzv else message("No variables with near zero variance")
+```
+//------------------------------------------------------
+## Training Prediction Model
+1. Setting up parallel clusters.
+```{r paraCluster}
+require(parallel)
+require(doParallel)
+
+clus <- makeCluster(detectCores() - 1)
+registerDoParallel(clus)
+```
+
+2. Setting up control parameters.
+```{r paramCtrl}
+ctrl <- trainControl(classProbs=TRUE,
+                     savePredictions=TRUE,
+                     allowParallel=TRUE)
+```
+
+3. Fit the parameters into the model.
+```{r paramFit}
+method <- "rf"
+system.time(trainingModel <- train(classe ~ ., data=DTrainCS, method=method))
+```
+
+4. Reset the clusters values.
+```{r stopClu}
+stopCluster(clus)
+```
+
+### Test the model on training dataset.
+```{r loadTrainModel}
+trainingModel
+```
+
+```{r testTrain}
+hat <- predict(trainingModel, DTrainCS)
+confusionMatrix(hat, DTrain[, classe])
+```
+
+### Test the model on test probing dataset.
+```{r testProbe}
+hat <- predict(trainingModel, DProbeCS)
+confusionMatrix(hat, DProbeCS[, classe])
+```
+
+### Present final model
+```{r varImpTrainModel}
+varImp(trainingModel)
+```
+
+```{r implementFinal}
+trainingModel$finalModel
+```
+
+The estimated error rate was less than 1%.
+Pack the training model into RData object to be used on prediction.
+```{r saveModel}
+save(trainingModel, file="trainingModel.RData")
+```
+
+## Prediction on test dataset.
+
+Load training model from previous session.
+```{r loadTrainTest}
+load(file="trainingModel.RData", verbose=TRUE)
+```
+
+Apply the training model to predict into the test dataset.
+```{r predictEval}
+DTestCS <- predict(preProc, DTest[, predCandidates, with=FALSE])
+hat <- predict(trainingModel, DTestCS)
+DTest <- cbind(hat , DTest)
+
+subset(DTest, select=names(DTest)[grep("belt|[^(fore)]arm|dumbbell|forearm", names(DTest), invert=TRUE)])
+```
