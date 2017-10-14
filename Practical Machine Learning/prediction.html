@@ -120,11 +120,18 @@ $(document).ready(function () {
 </div>
 
 
-<div id="general-setup" class="section level3">
-<h3>General Setup</h3>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. This task is to perform analysis on barbell lifts correctly and incorrectly in 5 different ways from the data by accelerometers on the belt, forearm, arm and dumble of 6 participants.</p>
+<ol style="list-style-type: decimal">
+<li><p>Training data: <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv" class="uri">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a></p></li>
+<li><p>Test data: <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" class="uri">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a></p></li>
+</ol>
+<p>These data comes from <a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a>.</p>
 </div>
-<div id="loading-datasets" class="section level3">
-<h3>Loading Datasets</h3>
+<div id="loading-datasets" class="section level2">
+<h2>Loading Datasets</h2>
+<p>Download the datasets and read it into data table.</p>
 <pre class="r"><code>require(data.table)</code></pre>
 <pre><code>## Loading required package: data.table</code></pre>
 <pre><code>## Warning: package 'data.table' was built under R version 3.4.2</code></pre>
@@ -132,6 +139,7 @@ $(document).ready(function () {
 D &lt;- fread(url)</code></pre>
 <pre class="r"><code>url &lt;- &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;
 DTest &lt;- fread(url)</code></pre>
+<p><code>belt</code>, <code>arm</code>, <code>dumbbell</code>, and <code>forearm</code> variables that do not have any missing values in the test dataset will be predictor candidates.</p>
 <pre class="r"><code>isAnyMissing &lt;- sapply(DTest, function (x) any(is.na(x) | x == &quot;&quot;))
 isPredictor &lt;- !isAnyMissing &amp; grepl(&quot;belt|[^(fore)]arm|dumbbell|forearm&quot;, names(isAnyMissing))
 predCandidates &lt;- names(isAnyMissing)[isPredictor]
@@ -231,7 +239,12 @@ DProbeCS &lt;- data.table(data.frame(classe = DProbe[, classe], XCS))</code></pr
 
 if (any(nzv$nzv)) nzv else message(&quot;No variables with near zero variance&quot;)</code></pre>
 <pre><code>## No variables with near zero variance</code></pre>
-<p>//—————————————————— ### Training Prediction Model 1. Setting up parallel clusters.</p>
+</div>
+<div id="training-prediction-model" class="section level2">
+<h2>Training Prediction Model</h2>
+<ol style="list-style-type: decimal">
+<li>Setting up parallel clusters.</li>
+</ol>
 <pre class="r"><code>require(parallel)</code></pre>
 <pre><code>## Loading required package: parallel</code></pre>
 <pre class="r"><code>require(doParallel)</code></pre>
@@ -254,14 +267,13 @@ registerDoParallel(clus)</code></pre>
 <pre class="r"><code>method &lt;- &quot;rf&quot;
 system.time(trainingModel &lt;- train(classe ~ ., data=DTrainCS, method=method))</code></pre>
 <pre><code>##    user  system elapsed 
-##   54.20    0.62 1812.38</code></pre>
+##   55.01    0.57 1869.44</code></pre>
 <ol start="4" style="list-style-type: decimal">
 <li>Reset the clusters values.</li>
 </ol>
 <pre class="r"><code>stopCluster(clus)</code></pre>
-</div>
-<div id="test-the-model-on-training-dataset." class="section level3">
-<h3>Test the model on training dataset.</h3>
+<div id="a.-test-the-model-on-training-dataset." class="section level3">
+<h3>a. Test the model on training dataset.</h3>
 <pre class="r"><code>trainingModel</code></pre>
 <pre><code>## Random Forest 
 ## 
@@ -315,8 +327,8 @@ confusionMatrix(hat, DTrain[, classe])</code></pre>
 ## Detection Prevalence   0.2843   0.1935   0.1744   0.1639   0.1838
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
 </div>
-<div id="test-the-model-on-test-probing-dataset." class="section level3">
-<h3>Test the model on test probing dataset.</h3>
+<div id="b.-test-the-model-on-test-probing-dataset." class="section level3">
+<h3>b. Test the model on test probing dataset.</h3>
 <pre class="r"><code>hat &lt;- predict(trainingModel, DProbeCS)
 confusionMatrix(hat, DProbeCS[, classe])</code></pre>
 <pre><code>## Confusion Matrix and Statistics
@@ -351,8 +363,8 @@ confusionMatrix(hat, DProbeCS[, classe])</code></pre>
 ## Detection Prevalence   0.2861   0.1925   0.1758   0.1635   0.1821
 ## Balanced Accuracy      0.9979   0.9921   0.9921   0.9914   0.9946</code></pre>
 </div>
-<div id="present-final-model" class="section level3">
-<h3>Present final model</h3>
+<div id="c.-present-final-model" class="section level3">
+<h3>c. Present final model</h3>
 <pre class="r"><code>varImp(trainingModel)</code></pre>
 <pre><code>## rf variable importance
 ## 
@@ -395,17 +407,21 @@ confusionMatrix(hat, DProbeCS[, classe])</code></pre>
 ## C    0   12 2036    6    0 0.008763389
 ## D    1    1   28 1897    3 0.017098446
 ## E    1    1    2    7 2154 0.005080831</code></pre>
-<p>The estimated error rate is less than 1%. Pack the training model into RData object to be used on prediction.</p>
+<p>The estimated error rate was less than 1%. Pack the training model into RData object to be used on prediction.</p>
 <pre class="r"><code>save(trainingModel, file=&quot;trainingModel.RData&quot;)</code></pre>
 </div>
-<div id="prediction-on-test-dataset." class="section level3">
-<h3>Prediction on test dataset.</h3>
+</div>
+<div id="prediction-on-test-dataset." class="section level2">
+<h2>Prediction on test dataset.</h2>
+<p>Load training model from previous session.</p>
 <pre class="r"><code>load(file=&quot;trainingModel.RData&quot;, verbose=TRUE)</code></pre>
 <pre><code>## Loading objects:
 ##   trainingModel</code></pre>
+<p>Apply the training model to predict into the test dataset.</p>
 <pre class="r"><code>DTestCS &lt;- predict(preProc, DTest[, predCandidates, with=FALSE])
 hat &lt;- predict(trainingModel, DTestCS)
 DTest &lt;- cbind(hat , DTest)
+
 subset(DTest, select=names(DTest)[grep(&quot;belt|[^(fore)]arm|dumbbell|forearm&quot;, names(DTest), invert=TRUE)])</code></pre>
 <pre><code>##     hat V1 user_name raw_timestamp_part_1 raw_timestamp_part_2
 ##  1:   B  1     pedro           1323095002               868349
